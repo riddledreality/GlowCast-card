@@ -620,13 +620,31 @@
       color: var(--gc-fg);
     }
     .gc-header { display:flex; align-items:center; gap:8px; margin-bottom:10px; padding:0 2px; }
+    .gc-header-text { flex:1; min-width:0; }
     .gc-logo {
       width:22px; height:22px; border-radius:7px; flex-shrink:0;
       background: linear-gradient(135deg, var(--gc-primary), #ff0080, #00d4ff);
       box-shadow: 0 0 10px color-mix(in srgb, var(--gc-primary) 40%, transparent);
     }
-    .gc-title { font-size:0.95rem; font-weight:700; margin:0; letter-spacing:-0.01em; flex:1; color:var(--gc-fg); }
+    .gc-title { font-size:0.95rem; font-weight:700; margin:0; letter-spacing:-0.01em; color:var(--gc-fg); }
     .gc-sub { font-size:0.7rem; color:var(--gc-muted); margin:0; }
+    .gc-stop-all {
+      flex-shrink:0; border:1px solid color-mix(in srgb, var(--error-color, #ff453a) 55%, var(--gc-border));
+      background: color-mix(in srgb, var(--error-color, #ff453a) 16%, var(--gc-bg));
+      color: var(--error-color, #ff453a); font-weight:700; font-size:.72rem; letter-spacing:.02em;
+      text-transform:uppercase; border-radius:999px; padding:7px 12px; cursor:pointer;
+      -webkit-appearance:none; appearance:none; font-family:inherit;
+    }
+    .gc-stop-all:disabled, .gc-stop-room:disabled { opacity:.45; cursor:default; }
+    .gc-stop-all:not(:disabled):active { transform:scale(0.97); }
+    .gc-stop-room {
+      display:none; width:100%; margin:0 0 12px; padding:14px 16px; border-radius:14px;
+      border:1px solid color-mix(in srgb, var(--error-color, #ff453a) 50%, var(--gc-border));
+      background: color-mix(in srgb, var(--error-color, #ff453a) 18%, var(--gc-bg));
+      color: var(--error-color, #ff453a); font-weight:750; font-size:.95rem; letter-spacing:.01em;
+      cursor:pointer; -webkit-appearance:none; appearance:none; font-family:inherit;
+    }
+    .gc-stop-room.visible { display:block; }
     .gc-grid { display:grid; grid-template-columns:repeat(var(--gc-cols,3),minmax(0,1fr)); gap:10px; }
     .gc-room {
       position:relative; display:flex; flex-direction:column; align-items:center; gap:6px;
@@ -895,8 +913,73 @@
 
     _togglePower(entityId) {
       if (!entityId) return;
-      this._callService("switch", "toggle", { entity_id: entityId });
+      const st = this._state(entityId);
+      // Prefer explicit turn_on/turn_off — never toggle for Stop paths.
+      if (st?.state === "on") {
+        this._callService("switch", "turn_off", { entity_id: entityId });
+      } else {
+        this._callService("switch", "turn_on", { entity_id: entityId });
+      }
     }
+
+    _anyShowRunning() {
+      return this._rooms.some((r) => this._state(r.entities?.power)?.state === "on");
+    }
+
+    async _stopRoom(room) {
+      if (!room || this._stopBusy) return;
+      this._stopBusy = true;
+      this._patchStopButtons();
+      try {
+        if (room.entities?.power) {
+          this._callService("switch", "turn_off", { entity_id: room.entities.power });
+        } else {
+          this._callService("glowcast", "stop", { room: room.id });
+        }
+      } finally {
+        setTimeout(() => {
+          this._stopBusy = false;
+          this._patchStopButtons();
+        }, 800);
+      }
+    }
+
+    async _stopAll() {
+      if (this._stopBusy) return;
+      this._stopBusy = true;
+      this._patchStopButtons();
+      try {
+        if (this._hass?.services?.glowcast?.stop_all) {
+          this._callService("glowcast", "stop_all", {});
+        } else {
+          this._callService("glowcast", "stop", {});
+        }
+      } finally {
+        setTimeout(() => {
+          this._stopBusy = false;
+          this._patchStopButtons();
+        }, 800);
+      }
+    }
+
+    _patchStopButtons() {
+      const root = this.shadowRoot;
+      if (!root) return;
+      const any = this._anyShowRunning();
+      const stopAll = root.querySelector('[data-action="stop-all"]');
+      if (stopAll) {
+        stopAll.hidden = !any;
+        stopAll.disabled = !!this._stopBusy;
+      }
+      const stopRoom = root.querySelector('[data-action="stop-room"]');
+      if (stopRoom && this._openRoomId) {
+        const room = this._roomById(this._openRoomId);
+        const on = this._state(room?.entities?.power)?.state === "on";
+        stopRoom.classList.toggle("visible", !!on);
+        stopRoom.disabled = !!this._stopBusy || !on;
+      }
+    }
+
 
     _selectOption(entityId, option) {
       if (!entityId || option == null) return;
@@ -986,10 +1069,11 @@
         <div class="gc-card">
           <div class="gc-header">
             <div class="gc-logo" aria-hidden="true"></div>
-            <div>
+            <div class="gc-header-text">
               <h2 class="gc-title"></h2>
               <p class="gc-sub"></p>
             </div>
+            <button type="button" class="gc-stop-all" data-action="stop-all" hidden>Stop all</button>
           </div>
           <div class="gc-grid" part="grid"></div>
         </div>
@@ -1010,6 +1094,9 @@
               <input type="checkbox" data-action="power" />
               <span class="track"><span class="thumb"></span></span>
             </label>
+          </div>
+          <div style="padding:0 16px">
+            <button type="button" class="gc-stop-room" data-action="stop-room">Stop</button>
           </div>
           <div class="gc-sheet-body">
             <div>
@@ -1174,6 +1261,17 @@
 
       root.addEventListener("change", (ev) => {
         const el = ev.target;
+        if (el?.dataset?.action === "stop-all") {
+          ev.preventDefault();
+          this._stopAll();
+          return;
+        }
+        if (el?.dataset?.action === "stop-room") {
+          ev.preventDefault();
+          const room = this._roomById(this._openRoomId);
+          this._stopRoom(room);
+          return;
+        }
         if (el?.dataset?.action === "power") {
           const room = this._roomById(this._openRoomId);
           if (room?.entities?.power) this._togglePower(room.entities.power);
@@ -1303,6 +1401,7 @@
       if (this._openRoomId) {
         this._fillSheet(this._roomById(this._openRoomId), false);
       }
+      this._patchStopButtons();
 
       this._built = true;
     }
@@ -1426,6 +1525,12 @@
       if (powerInput) {
         powerInput.checked = on;
         powerInput.disabled = !room.entities.power;
+
+      }
+      const stopRoomBtn = root.querySelector('[data-action="stop-room"]');
+      if (stopRoomBtn) {
+        stopRoomBtn.classList.toggle("visible", !!on);
+        stopRoomBtn.disabled = !!this._stopBusy || !on;
       }
 
       const themesEl = root.querySelector('[data-role="themes"]');

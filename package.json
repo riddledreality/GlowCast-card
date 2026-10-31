@@ -1,6 +1,6 @@
 {
   "name": "glowcast-card",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Home Assistant Lovelace card for GlowCast (domain glowcast)",
   "main": "index.js",
   "directories": {
