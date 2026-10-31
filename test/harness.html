@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>GlowCast Card v0.2 — harness</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100vh; }
+    body {
+      padding: 16px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+    body.theme-dark {
+      background: #0b0b0f;
+      color: #f5f5f7;
+      --ha-card-background: #1c1c1e;
+      --card-background-color: #1c1c1e;
+      --primary-text-color: #f5f5f7;
+      --secondary-text-color: #98989f;
+      --divider-color: rgba(255,255,255,0.12);
+      --primary-color: #bf5af2;
+      --ha-card-border-radius: 18px;
+      --ha-card-box-shadow: 0 2px 8px rgba(0,0,0,0.35);
+      --switch-checked-color: #34c759;
+      --text-primary-color: #fff;
+      --ha-dialog-surface-background: #1c1c1e;
+    }
+    body.theme-light {
+      background: #f2f2f7;
+      color: #1c1c1e;
+      --ha-card-background: #ffffff;
+      --card-background-color: #ffffff;
+      --primary-text-color: #1c1c1e;
+      --secondary-text-color: #6d6d72;
+      --divider-color: rgba(0,0,0,0.12);
+      --primary-color: #af52de;
+      --ha-card-border-radius: 18px;
+      --ha-card-box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      --switch-checked-color: #34c759;
+      --text-primary-color: #fff;
+      --ha-dialog-surface-background: #ffffff;
+    }
+    h1 { font-size: 1rem; margin: 0 0 4px; }
+    .meta { opacity: 0.7; font-size: 0.75rem; margin-bottom: 12px; }
+    #mount { max-width: 390px; margin: 0 auto; }
+  </style>
+</head>
+<body>
+  <div style="max-width:390px;margin:0 auto 10px">
+    <h1>GlowCast Card v0.2</h1>
+    <p class="meta" id="meta">Compact pills + bottom sheet · 390px</p>
+  </div>
+  <div id="mount"></div>
+  <script src="./mock-hass.js"></script>
+  <script src="../glowcast-card.js"></script>
+  <script>
+    (function () {
+      const params = new URLSearchParams(location.search);
+      const theme = params.get("theme") === "light" ? "light" : "dark";
+      document.body.classList.add("theme-" + theme);
+      document.getElementById("meta").textContent =
+        "Compact pills + sheet · 390px · " + theme + " theme";
+      const open = params.get("open");
+      const { hass } = GlowCastMockHass.build();
+      const orig = hass.callService.bind(hass);
+      hass.callService = function (domain, service, data) {
+        orig(domain, service, data);
+        card.hass = hass;
+      };
+      const card = document.createElement("glowcast-card");
+      card.setConfig({
+        title: "GlowCast",
+        columns: 3,
+        rooms: {
+          all_lights: { name: "All lights", icon: "mdi:lightbulb-group" },
+          kitchen: { name: "Kitchen", icon: "mdi:silverware-fork-knife" },
+          nerd_cave: { name: "Nerd Cave", icon: "mdi:desktop-classic" },
+        },
+      });
+      card.hass = hass;
+      document.getElementById("mount").appendChild(card);
+      window.__GLOWCAST_HARNESS__ = { card, hass };
+      if (open) {
+        requestAnimationFrame(() => {
+          card._openSheet(open);
+          document.body.dataset.popup = "1";
+          if (params.get("color") === "1") {
+            try {
+              GlowCastCardHelpers.saveRecentColor([255, 149, 0]);
+              GlowCastCardHelpers.saveRecentColor([0, 122, 255]);
+            } catch (e) {}
+            card._colorOpen = false;
+            card._toggleColorPanel();
+            document.body.dataset.color = "1";
+          }
+        });
+      }
+      document.title = "GlowCast Card v0.2 — ready";
+      document.body.dataset.ready = "1";
+      document.body.dataset.theme = theme;
+    })();
+  </script>
+</body>
+</html>

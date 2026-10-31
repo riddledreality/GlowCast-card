@@ -1,0 +1,23 @@
+{
+  "name": "glowcast-card",
+  "version": "0.2.2",
+  "description": "Home Assistant Lovelace card for GlowCast (domain glowcast)",
+  "main": "index.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "test": "node test/selftest.mjs",
+    "screenshot": "node test/screenshot.mjs"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "jsdom": "^29.1.1",
+    "playwright": "^1.64.1",
+    "playwright-core": "^1.64.1",
+    "puppeteer-core": "^24.43.1"
+  }
+}
