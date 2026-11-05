@@ -4,7 +4,7 @@
 
 Custom Home Assistant Lovelace card for the **GlowCast** integration (`domain: glowcast`).
 
-**v0.2.2** — compact Bubble Card–style room pills with a bottom-sheet pop-up. Space-saving and mobile-first (iPhone).
+**v0.2.3** — compact Bubble Card–style room pills with a bottom-sheet pop-up. Space-saving and mobile-first (iPhone).
 
 > Do **not** install into HA until ready. Keep any installed v1 resource in place until you choose to upgrade the file.
 
@@ -19,6 +19,13 @@ Custom Home Assistant Lovelace card for the **GlowCast** integration (`domain: g
 - **In-place DOM updates** — hass state pushes patch the UI without rebuilding controls (keeps tap handlers alive)
 - Auto-discovers `platform: glowcast` entities; YAML `rooms:` / `columns:` overrides
 - `getStubConfig` + config editor (icon fields; uses `ha-icon-picker` when available)
+
+## Changelog
+
+### 0.2.3
+- Prominent **Stop all** in the card header (visible while any room show is running)
+- Big **Stop** button in each room sheet (calls `switch.turn_off` / `glowcast.stop`, never toggle)
+- Stop buttons disable briefly while the call is in flight
 
 ## Requires
 
